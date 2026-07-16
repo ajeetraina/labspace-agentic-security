@@ -12,19 +12,19 @@ description: |
 
 sections:
   - title: Introduction
-    contentPath: labspace/01-introduction.md
+    contentPath: 01-introduction.md
   - title: Setup
-    contentPath: labspace/02-setup.md
+    contentPath: 02-setup.md
   - title: "Lab 1 — Migrate to Docker Hardened Images"
-    contentPath: labspace/03-lab-migrate-dhi.md
+    contentPath: 03-lab-migrate-dhi.md
   - title: "Lab 2 — SBOM Generation & Signature Verification"
-    contentPath: labspace/04-lab-sbom-attestations.md
+    contentPath: 04-lab-sbom-attestations.md
   - title: "Lab 3 — CI Policy Enforcement (GitHub Actions)"
-    contentPath: labspace/05-lab-ci-policy.md
+    contentPath: 05-lab-ci-policy.md
   - title: "Lab 4 — MCP Server on Docker Hardened Images"
-    contentPath: labspace/06-lab-mcp-dhi.md
+    contentPath: 06-lab-mcp-dhi.md
   - title: Conclusion & Next Steps
-    contentPath: labspace/07-conclusion.md
+    contentPath: 07-conclusion.md
 
 services:
   - id: app

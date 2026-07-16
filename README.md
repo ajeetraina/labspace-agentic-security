@@ -6,13 +6,13 @@ Hands-on lab materials for the **Securing the Agentic Stack** workshop.
 
 ```
 workshop-agentic-security/
-├── labspace.yaml                    # Labspace manifest
 ├── compose.yaml                     # Labspace runtime
 ├── compose.override.yaml
 ├── docker-scout-policy.yaml         # Scout build policies
 ├── .github/workflows/
 │   └── secure-build.yml             # Complete CI pipeline
 ├── labspace/                        # Step-by-step lab guides
+│   ├── labspace.yaml                # Labspace manifest
 │   ├── 01-introduction.md
 │   ├── 02-setup.md
 │   ├── 03-lab-migrate-dhi.md        # Lab 1: Migrate to DHI
