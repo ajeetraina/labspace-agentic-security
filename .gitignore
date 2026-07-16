@@ -1,0 +1,4 @@
+# Learner workspace — vendored snapshot of catalog-service-node.
+# A baseline is committed so the labspace boots in local DEV_MODE, but
+# runtime churn (node_modules, learner edits, build output) stays untracked.
+project/
