@@ -59,6 +59,28 @@ docker scout config organization YOUR_ORG
 
 The complete workshop is also hosted at **https://dockerworkshop.vercel.app/**.
 
+## Facilitator smoke test (run before a live workshop)
+
+Lab 3 depends on the bundled Gitea + runner + registry from the `:dev-sdlc`
+runtime variant. Verify it once before presenting — a few values (notably the
+seeded Gitea repo name) come from the runtime image, not this repo:
+
+1. **Boot it:** `bash start-labspace.sh`, then open http://localhost:3030.
+2. **Gitea is up:** open http://git.dockerlabs.xyz and log in as `moby` / `moby1234`.
+3. **Registry is up:** `curl -s http://registry.dockerlabs.xyz/v2/_catalog` returns JSON.
+4. **Confirm the seeded repo path:** in the workspace terminal run `git remote -v`.
+   Lab 3's image tag uses `${{ github.repository }}`, so it auto-follows this
+   path — but confirm it resolves to `moby/<repo>` as the lab text assumes.
+5. **Pre-configured secrets exist:** in the Gitea repo → Settings → Actions →
+   Secrets, confirm `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`.
+6. **Scout gate needs cloud auth (not offline):** the Scout step is a real cloud
+   call, so add `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `DOCKER_SCOUT_ORG`
+   as repo secrets, plus `COSIGN_PRIVATE_KEY` / `COSIGN_PASSWORD` for signing
+   (see Lab 3, Step 2). Do a full push once to confirm the pipeline goes green.
+
+> If the seeded repo name or secret names differ in your runtime image, adjust
+> Lab 3's Step 1–2 text accordingly.
+
 ## Workshop deck
 
 The companion slide deck is **"Securing the Agentic Stack: Docker Hardened Images
