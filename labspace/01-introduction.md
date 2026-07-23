@@ -114,7 +114,7 @@ You'll generate, inspect, and verify each of them in the labs.
 |-----|------|------|
 | **Lab 1** | Migrate `catalog-service-node` from `node:20` to DHI — watch the CVE count collapse | ~20 min |
 | **Lab 2** | Generate an SBOM, inspect VEX + SLSA attestations, verify the digital signature | ~20 min |
-| **Lab 3** | Wire Docker Scout into GitHub Actions — watch a build fail, then pass | ~45 min |
+| **Lab 3** | Wire Docker Scout + Cosign into a Gitea Actions pipeline — watch a build fail, then pass | ~45 min |
 | **Lab 4** | Build a Python MCP server on `hardened-python`, run it hardened, verify it | ~30 min |
 
 > **Key numbers you will reproduce:**

@@ -1,0 +1,96 @@
+name: Secure Build
+
+# The secure CI pipeline for Lab 3, running on the labspace's self-hosted Gitea
+# Actions runner:
+#   CHECKOUT → BUILD (DHI) → ATTEST → POLICY (Scout gate) → PUSH → SIGN (Cosign)
+#
+# The Docker Scout policy step is a HARD gate — `exit-code: true` stops the
+# pipeline and nothing is pushed if a critical/high CVE is found. Signing uses a
+# Cosign key pair (the same key-based model Docker uses to sign Hardened Images),
+# so it works fully locally with no OIDC provider.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  secure-build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. CHECKOUT
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            # Skip TLS for the lab's local registry — never do this for real registries
+            [registry."registry.dockerlabs.xyz"]
+              insecure = true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Local registry (pre-configured secrets from the labspace)
+      - name: Log in to the local registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Docker Hub — Docker Scout is a cloud service and needs a Scout-enabled org.
+      # Add DOCKERHUB_USERNAME / DOCKERHUB_TOKEN / DOCKER_SCOUT_ORG as repo secrets.
+      - name: Log in to Docker Hub (for Docker Scout)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 2. BUILD (DHI base) + 3. ATTEST (SBOM + provenance)
+      # Build locally first so the Scout gate runs BEFORE anything is pushed.
+      - name: Build with SBOM and provenance
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          sbom: true
+          provenance: mode=max
+          tags: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:${{ github.sha }}
+
+      # 4. POLICY — Docker Scout hard gate: fail on any critical/high CVE
+      - name: Docker Scout policy gate
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:${{ github.sha }}
+          organization: ${{ secrets.DOCKER_SCOUT_ORG }}
+          only-severities: critical,high
+          exit-code: true
+
+      # 5. PUSH — only reached if the gate passed. Capture the digest for signing.
+      - name: Push image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          sbom: true
+          provenance: mode=max
+          tags: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:latest
+
+      # 6. SIGN — key-based Cosign (same model Docker uses for DHI)
+      - name: Sign the image with Cosign
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            --allow-insecure-registry --allow-http-registry \
+            ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}@${DIGEST}

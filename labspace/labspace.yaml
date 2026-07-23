@@ -31,3 +31,11 @@ services:
     url: http://localhost:3050
     title: App
     icon: draft
+  - id: gitea
+    url: http://git.dockerlabs.xyz
+    title: Gitea
+    icon: account_tree
+  - id: registry
+    url: http://registry.dockerlabs.xyz
+    title: Registry
+    icon: inventory_2

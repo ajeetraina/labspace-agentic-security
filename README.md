@@ -6,18 +6,18 @@ Hands-on lab materials for the **Securing the Agentic Stack** workshop.
 
 ```
 labspace-agentic-security/
-├── compose.yaml                     # Labspace runtime
+├── compose.yaml                     # Labspace runtime (Gitea-enabled variant)
 ├── compose.override.yaml
 ├── docker-scout-policy.yaml         # Scout build policies
-├── .github/workflows/
-│   └── secure-build.yml             # Complete CI pipeline
+├── .gitea/workflows/
+│   └── secure-build.yaml            # Secure CI pipeline (Gitea Actions)
 ├── labspace/                        # Step-by-step lab guides
 │   ├── labspace.yaml                # Labspace manifest
 │   ├── 01-introduction.md
 │   ├── 02-setup.md
 │   ├── 03-lab-migrate-dhi.md        # Lab 1: Migrate to DHI
 │   ├── 04-lab-sbom-attestations.md  # Lab 2: SBOM + signatures
-│   ├── 05-lab-ci-policy.md          # Lab 3: GitHub Actions
+│   ├── 05-lab-ci-policy.md          # Lab 3: Gitea Actions CI pipeline
 │   ├── 06-lab-mcp-dhi.md            # Lab 4: MCP server on DHI
 │   └── 07-conclusion.md
 └── lab/
@@ -35,10 +35,12 @@ labspace-agentic-security/
 ## Prerequisites
 
 - Docker Desktop 4.30+
-- Docker Hub account (free)
+- Docker Hub account (free) with Docker Scout enabled on your org
 - `cosign` CLI installed (`brew install cosign`)
-- GitHub account (for Lab 3)
-- Docker Scout enabled on your org
+
+> Lab 3 runs its CI pipeline on a **self-hosted Gitea** bundled in the labspace
+> (`git.dockerlabs.xyz`) with a local registry (`registry.dockerlabs.xyz`) — no
+> GitHub account needed.
 
 ## Quick start
 
