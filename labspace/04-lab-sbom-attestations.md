@@ -1,7 +1,50 @@
-# Lab 2 — SBOM Generation & Signature Verification
+# Lab 2 — Secure Software Supply Chain: SBOM · VEX · SLSA
 
 > **Goal:** Attach a full SBOM and provenance to your image, inspect all attestations,
 > and verify the digital signature.
+
+## The building blocks — three standards every developer should understand
+
+### SBOM — Software Bill of Materials (your ingredient list)
+
+A complete, machine-readable list of every component in your software — packages,
+libraries, versions, licenses, and their relationships.
+
+- Know what is in every image you ship
+- Respond to new CVEs in **seconds, not days**
+- Required for SLSA compliance and enterprise contracts
+
+SBOMs come in different formats — **SPDX** and **CycloneDX** — and can carry an
+embedded **VEX** document.
+
+### VEX — Vulnerability Exploitability eXchange (cutting through CVE noise)
+
+| Without VEX | With VEX (DHI) |
+|-------------|----------------|
+| *"Your image has 200 CVEs."* Developer spends a week triaging. 190 are in packages not reachable by the running process. 10 are actually relevant. | *"190 not affected. 10 fixed."* Publisher attests: component not present, not reachable, or already fixed. Developer knows in seconds what actually needs action. |
+| Signal-to-noise: **terrible** | Signal-to-noise: **surgical** |
+
+VEX also comes in multiple formats: OpenVEX, the SPDX SBOM format, OASIS CSAF, and
+OWASP CycloneDX.
+
+### SLSA — Supply chain Levels for Software Artifacts (build provenance)
+
+*Can you prove this artifact came from that source, and was not tampered with in
+transit? SLSA makes that question answerable.*
+
+| Level | What it means |
+|-------|---------------|
+| **L0** | No guarantees |
+| **L1** | Provenance exists — build metadata documented |
+| **L2** | Hosted build + signed provenance (GitHub Actions with OIDC achieves this) |
+| **L3** | Hardened build, non-falsifiable provenance — **DHI target level** |
+
+**DHI gives you:** a signed provenance envelope, hermetic/reproducible builds, and
+verifiability with Cosign / Notation.
+
+In this lab you'll produce and inspect each of these for a real image.
+
+---
 
 ## Step 1 — Build with full attestations
 

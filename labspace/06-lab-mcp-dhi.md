@@ -1,20 +1,35 @@
-# Lab 4 — MCP Server on Docker Hardened Images
+# Lab 4 — Securing the Agentic Stack: MCP Server on DHI
 
 > **Goal:** Build a Python MCP server on a hardened base, run it with full runtime
 > hardening, verify its attestations, and connect an MCP client.
 
-## Why MCP servers need hardened containers
+## The better the agent, the bigger the blast radius
 
-MCP servers are autonomous tools called by AI agents — often with access to
-filesystems, databases, and external APIs. One compromised MCP server can:
+MCP servers execute code, call APIs, and access filesystems autonomously — often
+with real credentials. One compromised MCP server can:
 
-- **Rug pull** — change behavior after you approved it
-- **Tool poison** — inject malicious prompts invisible to humans
-- **Exfiltrate credentials** — read env vars exposed by the agent host
+- **Rug pull** — the server changes behavior after you approved it
+- **Tool poisoning** — malicious prompts invisible to users, clear to the AI
+- **Credential exfiltration** — hardcoded env vars are an easy target
 
-Running MCP servers in containers with `read_only + cap_drop` bounds the blast radius:
-even fully compromised, the server cannot write files, escalate privileges, or
-reach outside its declared network scope.
+### Container isolation = blast radius boundary
+
+Run MCP servers in containers. Even a **fully compromised** MCP server cannot reach
+beyond its container boundary — no host filesystem, no sibling services, no
+credentials it was not explicitly given.
+
+> *"Containers brought order to app deployment. They can do the same for agentic AI."*
+
+### What you get for free with an MCP server on DHI
+
+- 📦 An **SBOM** of every package in your MCP server
+- ✍️ A **digital signature** — verify before invoking
+- 🧱 **Container isolation** — blast radius bounded
+- 🚫 **No shell, no curl** — reduced attack vectors
+
+Running the server with `read_only + cap_drop: ALL + no-new-privileges` bounds the
+blast radius: even fully compromised, it cannot write files, escalate privileges,
+or reach outside its declared network scope.
 
 ---
 
@@ -184,3 +199,18 @@ docker compose down
 | `no-new-privileges` | Gain privs via SUID binaries | SUID bits ignored |
 | Distroless base | `curl` payloads, shell pivoting | No shell, no curl |
 | Signed SBOM | Unknown dependencies | Full audit trail |
+
+---
+
+## The complete agentic supply chain
+
+You have now built every link in this chain. **Every step is verifiable. Every
+artifact is trusted.**
+
+```text no-copy-button
+ BASE               BUILD              POLICY            SIGN             REGISTRY          DEPLOY
+ DHI Python/Node →  Docker Buildx  →   Scout Check  →    Notation     →   Docker Hub    →  MCP Container
+ 0 CVEs · SLSA L3   SBOM+Provenance    No critical CVEs  OCI referrer     Signed image     Verified · Isolated
+
+                          Agent / MCP client  --invokes-->  Verified MCP server in a DHI container
+```

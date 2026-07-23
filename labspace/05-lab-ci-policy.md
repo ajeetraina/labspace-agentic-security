@@ -1,11 +1,74 @@
-# Lab 3 — CI Policy Enforcement with GitHub Actions
+# Lab 3 — Securing Your CI Pipeline
 
 > **Goal:** Wire Docker Scout into a GitHub Actions pipeline. Watch a build fail
 > because of missing attestations and CVEs, then fix it with one Dockerfile change.
 
+## Docker Scout build policies — security as code
+
+Define rules that **automatically fail the build** before anything insecure reaches
+your registry or production.
+
+**Policies to enforce today:**
+
+- ✅ Block images with critical CVEs
+- ✅ Require a valid SBOM attestation
+- ✅ Require SLSA provenance
+- ✅ Block unsigned images from promotion
+
+> Only signed, attested images reach production.
+
+```yaml no-copy-button
+# docker-scout-policy.yaml
+version: "1"
+policies:
+  - name: no-critical-cves
+    type: vulnerability
+    severity: critical
+    action: fail
+  - name: require-sbom
+    type: attestation
+    attestation: sbom
+    action: fail
+  - name: require-provenance
+    type: attestation
+    attestation: slsa-provenance
+    action: fail
+```
+
+## Image signing with Notation
+
+1. Build the image **with attestations**
+2. **Sign** with Notation after push
+3. Signature is stored as an **OCI referrer**
+4. **Verify at deploy** — CI gate or admission controller
+
+```bash no-copy-button
+# Sign the image after push
+notation sign myorg/myapp:v1.0
+
+# Verify before deploy
+notation verify myorg/myapp:v1.0
+```
+
+Works with Docker Hub · AWS ECR · Azure ACR · GitHub GHCR · any OCI registry
+supporting referrers.
+
+## The complete secure CI pipeline
+
+```text no-copy-button
+1. CHECKOUT      2. BUILD (DHI)     3. ATTEST         4. POLICY        5. SIGN          6. PUSH
+actions/         FROM docker/       --sbom=true       docker/scout     notation sign    docker/build-
+checkout@v4      hardened-node:20   --provenance      -action@v1       myorg/myapp      push-action@v6
+                                    =mode=max         compare          :v1.0
+```
+
+You'll build exactly this pipeline below and watch the **POLICY** gate do its job.
+
+---
+
 ## Step 1 — Fork the repo and add secrets
 
-Fork `github.com/docker/workshop-agentic-security` to your GitHub account.
+Fork `github.com/ajeetraina/labspace-agentic-security` to your GitHub account.
 
 Add these secrets in **Settings → Secrets and variables → Actions**:
 

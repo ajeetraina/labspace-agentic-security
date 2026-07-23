@@ -1,6 +1,32 @@
-# Lab 1 — Migrate to Docker Hardened Images
+# Lab 1 — Standard Image vs Docker Hardened Images
 
-> **Goal:** Change one FROM line. Watch 193 CVEs become 0.
+> **Goal:** Change one FROM line. Watch the CVE count collapse to 0.
+
+## What makes a hardened image *hardened*
+
+| Minimal | Attested | Patched |
+|---------|----------|---------|
+| Built from source. Only the packages your runtime actually needs. No shell, no curl, no extras. | Every image ships with an SBOM, a VEX document, SLSA provenance, and a digital signature. Verify in one command. | Continuously updated. Near-zero CVEs on day one, and Docker keeps it that way as new vulnerabilities emerge. |
+| **~95% smaller** | **SBOM ✓ · VEX ✓ · SLSA L3 ✓ · Signed ✓** | **~0 CVEs on day one** |
+
+The effect is dramatic. The hardened Ruby image, before and after:
+
+| `standard ruby:3.3` | `docker/hardened-ruby:3.3` |
+|---------------------|----------------------------|
+| **193** vulnerabilities (6 Critical · 53 High · + Medium/Low) | **0** — all vulnerabilities eliminated |
+
+And migration is **one line** — same Alpine/Debian base, same tooling, custom
+certs/configs/init scripts still supported:
+
+```diff no-copy-button
+- FROM node:20-alpine
++ FROM docker/hardened-node:20-alpine
+```
+
+In this lab you'll do exactly that to the `catalog-service-node` app and measure
+the result with Docker Scout.
+
+---
 
 ## Step 1 — Scan the baseline image
 
