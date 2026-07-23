@@ -22,29 +22,6 @@ enable **Image Analysis** so Scout can inspect images locally.
 
 ---
 
-## Set up the labspace
-
-A labspace is a fully-packaged playground environment for labs, workshops, and
-trainings. It runs locally.
-
-**Install Git**, then clone this repo and start local development mode:
-
-```bash terminal-id=main
-git clone https://github.com/ajeetraina/labspace-agentic-security
-cd labspace-agentic-security
-bash start-labspace.sh
-```
-
-Then **access the lab via port 3030**:
-
-👉 http://localhost:3030
-
-The full workshop is also hosted at **https://dockerworkshop.vercel.app/**.
-
-> Labspace infra: https://github.com/dockersamples/labspace-infra
-
----
-
 ## Configure your Docker org & registry
 
 ## 1. Docker org setup
