@@ -40,7 +40,7 @@ transit? SLSA makes that question answerable.*
 | **L3** | Hardened build, non-falsifiable provenance — **DHI target level** |
 
 **DHI gives you:** a signed provenance envelope, hermetic/reproducible builds, and
-verifiability with Cosign / Notation.
+verifiability with Cosign.
 
 In this lab you'll produce and inspect each of these for a real image.
 
@@ -113,24 +113,42 @@ Note the `builder.id`, `materials` (source repo + commit SHA), and
 `invocation.parameters` fields. This is the non-falsifiable record of what
 produced this artifact.
 
-## Step 6 — Sign the image with Notation
+## Step 6 — Sign the image with Cosign
+
+First generate a signing key pair (one time). We export an empty `COSIGN_PASSWORD`
+so the keygen is non-interactive for the lab — in production you'd use a real
+passphrase or a KMS/keyless flow.
 
 ```bash terminal-id=build
-notation sign $$org$$/catalog-service:v1.0
+export COSIGN_PASSWORD=""
+cosign generate-key-pair
 ```
 
+This creates `cosign.key` (private — keep it safe) and `cosign.pub` (public — share
+it for verification). Now sign the image:
+
 ```bash terminal-id=build
-notation list $$org$$/catalog-service:v1.0
+cosign sign --key cosign.key $$org$$/catalog-service:v1.0 --yes
+```
+
+The signature is stored back in the registry as an OCI artifact, right next to the
+image. List everything attached to the image:
+
+```bash terminal-id=build
+cosign tree $$org$$/catalog-service:v1.0
 ```
 
 ## Step 7 — Verify the signature
 
 ```bash terminal-id=build
-notation verify $$org$$/catalog-service:v1.0
+cosign verify --key cosign.pub $$org$$/catalog-service:v1.0
 ```
 
 ```none no-copy-button
-Successfully verified signature for $$org$$/catalog-service:v1.0
+Verification for $$org$$/catalog-service:v1.0 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - The signatures were verified against the specified public key
 ```
 
 ## Step 8 — Export VEX for use with external scanners

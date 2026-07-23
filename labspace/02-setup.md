@@ -71,20 +71,23 @@ cd catalog-service-node
 docker build -t catalog-service:baseline --sbom=true --provenance=mode=max .
 ```
 
-## 6. Verify Notation is installed
+## 6. Verify Cosign is installed
+
+We use [Cosign](https://docs.sigstore.dev/cosign/) (from the Sigstore project) to
+sign and verify images.
 
 ```bash terminal-id=main
-notation version
+cosign version
 ```
 
 If not installed:
 ```bash terminal-id=main
 # macOS
-brew install notation
+brew install cosign
 
 # Linux
-curl -Lo notation.tar.gz https://github.com/notaryproject/notation/releases/latest/download/notation_linux_amd64.tar.gz
-tar xzf notation.tar.gz && sudo mv notation /usr/local/bin/
+curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+chmod +x cosign && sudo mv cosign /usr/local/bin/
 ```
 
 ## 7. Check prerequisites
@@ -92,7 +95,7 @@ tar xzf notation.tar.gz && sudo mv notation /usr/local/bin/
 ```bash terminal-id=main
 docker --version       # Docker Desktop 4.30+ recommended
 docker scout version   # Scout CLI
-notation version       # Notation
+cosign version         # Cosign (image signing)
 git --version
 ```
 

@@ -1,10 +1,12 @@
 name: Secure Build
 
 # The complete secure CI pipeline for Lab 3:
-#   CHECKOUT → BUILD (DHI) → ATTEST → POLICY (Scout gate) → SIGN → PUSH
+#   CHECKOUT → BUILD (DHI) → ATTEST → POLICY (Scout gate) → PUSH → SIGN (Cosign keyless)
 #
 # The Docker Scout policy step is a HARD gate — `exit-code: true` stops the
-# pipeline and nothing reaches the registry if any policy fails.
+# pipeline and nothing is pushed if any policy fails. Signing is keyless: the
+# GitHub OIDC token is exchanged for a short-lived Sigstore certificate, so
+# there are no private keys to manage.
 
 on:
   push:
@@ -15,7 +17,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write      # OIDC — needed for SLSA L2 provenance + signing
+      id-token: write      # OIDC — SLSA provenance + Cosign keyless signing
       contents: read
 
     steps:
@@ -31,7 +33,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
       # 2. BUILD (DHI base)  +  3. ATTEST (SBOM + provenance)
+      # Build locally first so the Scout gate runs BEFORE anything is pushed.
       - name: Build with SBOM and provenance
         id: build
         uses: docker/build-push-action@v6
@@ -54,14 +60,9 @@ jobs:
           only-severities: critical,high
           exit-code: true        # ← fails the build if policy not met
 
-      # 5. SIGN
-      - name: Sign with Notation
-        run: |
-          notation sign \
-            ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ github.sha }}
-
-      # 6. PUSH — only signed, attested images reach the registry
-      - name: Push signed image
+      # 5. PUSH — only reached if the gate passed. Capture the digest for signing.
+      - name: Push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: lab/03-policy
@@ -69,3 +70,11 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:latest
+
+      # 6. SIGN — Cosign keyless (no keys to manage)
+      - name: Sign with Cosign (keyless, OIDC)
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service@${DIGEST}

@@ -35,31 +35,36 @@ policies:
     action: fail
 ```
 
-## Image signing with Notation
+## Image signing with Cosign
 
-1. Build the image **with attestations**
-2. **Sign** with Notation after push
-3. Signature is stored as an **OCI referrer**
+In CI we use **Cosign keyless signing** — no private keys to manage. The GitHub
+Actions OIDC token is exchanged for a short-lived certificate, and the signature +
+certificate are stored in the registry next to the image.
+
+1. Build and push the image **with attestations**
+2. **Sign** with Cosign using the workflow's OIDC identity (keyless)
+3. Signature is stored as an **OCI artifact** next to the image
 4. **Verify at deploy** — CI gate or admission controller
 
 ```bash no-copy-button
-# Sign the image after push
-notation sign myorg/myapp:v1.0
+# Sign keyless after push (OIDC — no keys to manage)
+cosign sign --yes myorg/myapp@sha256:<digest>
 
-# Verify before deploy
-notation verify myorg/myapp:v1.0
+# Verify against the workflow identity that signed it
+cosign verify myorg/myapp@sha256:<digest> \
+  --certificate-identity-regexp "https://github.com/ajeetraina/labspace-agentic-security/.*" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Works with Docker Hub · AWS ECR · Azure ACR · GitHub GHCR · any OCI registry
-supporting referrers.
+Works with Docker Hub · AWS ECR · Azure ACR · GitHub GHCR · any OCI registry.
 
 ## The complete secure CI pipeline
 
 ```text no-copy-button
-1. CHECKOUT      2. BUILD (DHI)     3. ATTEST         4. POLICY        5. SIGN          6. PUSH
-actions/         FROM docker/       --sbom=true       docker/scout     notation sign    docker/build-
-checkout@v4      hardened-node:20   --provenance      -action@v1       myorg/myapp      push-action@v6
-                                    =mode=max         compare          :v1.0
+1. CHECKOUT      2. BUILD (DHI)     3. ATTEST         4. POLICY        5. PUSH          6. SIGN
+actions/         FROM docker/       --sbom=true       docker/scout     docker/build-    cosign sign
+checkout@v4      hardened-node:20   --provenance      -action@v1       push-action@v6   --yes (keyless)
+                                    =mode=max         compare
 ```
 
 You'll build exactly this pipeline below and watch the **POLICY** gate do its job.
@@ -176,8 +181,8 @@ Watch Actions again. All six steps go green:
 ✓  No unapproved base images
 ✓  Default non-root user
 
-Image signed with Notation ✓
 Pushed to registry ✓
+Image signed with Cosign (keyless) ✓
 ```
 
 ## Step 5 — Verify the pushed image locally
@@ -185,7 +190,9 @@ Pushed to registry ✓
 ```bash terminal-id=build
 docker pull $$org$$/catalog-service:latest
 docker scout quickview $$org$$/catalog-service:latest --org $$org$$
-notation verify $$org$$/catalog-service:latest
+cosign verify $$org$$/catalog-service:latest \
+  --certificate-identity-regexp "https://github.com/ajeetraina/labspace-agentic-security/.*" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 All three commands confirm: zero CVEs, full attestations, valid signature.
@@ -218,6 +225,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Build locally first so the Scout gate runs BEFORE anything is pushed.
       - name: Build with SBOM and provenance
         id: build
         uses: docker/build-push-action@v6
@@ -229,7 +240,7 @@ jobs:
           provenance: mode=max
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ github.sha }}
 
-      - name: Docker Scout policy check
+      - name: Docker Scout policy check    # hard gate
         uses: docker/scout-action@v1
         with:
           command: compare
@@ -239,12 +250,9 @@ jobs:
           only-severities: critical,high
           exit-code: true
 
-      - name: Sign with Notation
-        run: |
-          notation sign \
-            ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ github.sha }}
-
-      - name: Push signed image
+      # Only reached if the gate passed. Push and capture the digest.
+      - name: Push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: lab/03-policy
@@ -252,4 +260,11 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:latest
+
+      - name: Sign with Cosign (keyless, OIDC)
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service@${DIGEST}
 ```

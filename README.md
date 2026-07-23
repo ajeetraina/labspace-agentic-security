@@ -36,7 +36,7 @@ labspace-agentic-security/
 
 - Docker Desktop 4.30+
 - Docker Hub account (free)
-- `notation` CLI installed (`brew install notation`)
+- `cosign` CLI installed (`brew install cosign`)
 - GitHub account (for Lab 3)
 - Docker Scout enabled on your org
 
@@ -83,5 +83,5 @@ which covers 8 container security best practices using `catalog-service-node`.
 - [Docker Scout](https://docs.docker.com/scout/)
 - [MCP Catalog on Docker Hub](https://hub.docker.com/mcp)
 - [SLSA framework](https://slsa.dev)
-- [Notation — image signing](https://notaryproject.dev)
+- [Cosign — image signing](https://docs.sigstore.dev/cosign/)
 - [State of Agentic AI Report](https://docker.com/resources/the-state-of-agentic-ai-white-paper)
