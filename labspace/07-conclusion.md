@@ -15,7 +15,7 @@
 
 ---
 
-## Your security framework
+## Your security framework — do this Monday
 
 ```
 1. Know what is in your images          →  SBOM + VEX
@@ -24,6 +24,25 @@
 4. Enforce at the pipeline              →  Docker Scout build policies
 5. Isolate your agents                  →  MCP servers in hardened containers
 ```
+
+---
+
+## The bigger picture
+
+Coding stopped being human-paced. Your developers are already shipping with
+agents — the only question is whether your platform ships with them, safely.
+
+> **One continuous trust chain. From source to production. From human developer to
+> autonomous agent.**
+
+Here in the agentic era, **speed and safety isn't a tradeoff**:
+
+- **For developers** — agents run without asking permission at every step. The work
+  happens, and nothing escapes the sandbox.
+- **For the platform team** — the safe path is the fast path. Developers stop routing
+  around you because what you ship is what they would have built themselves — only governed.
+- **For security** — become a policy authority, not the inbox. Write the rails once;
+  the runtime enforces them and the audit log writes itself.
 
 ---
 
@@ -55,6 +74,8 @@ docker buildx build --sbom=true --provenance=mode=max -t IMAGE --push .
 
 | Resource | URL |
 |----------|-----|
+| Lab repo | github.com/ajeetraina/labspace-agentic-security |
+| Full workshop | dockerworkshop.vercel.app |
 | Docker Hardened Images | hub.docker.com → Trusted Content → Hardened Images |
 | Docker Scout docs | docs.docker.com/scout |
 | MCP Catalog | hub.docker.com/mcp |

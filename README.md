@@ -5,7 +5,7 @@ Hands-on lab materials for the **Securing the Agentic Stack** workshop.
 ## Structure
 
 ```
-workshop-agentic-security/
+labspace-agentic-security/
 ├── compose.yaml                     # Labspace runtime
 ├── compose.override.yaml
 ├── docker-scout-policy.yaml         # Scout build policies
@@ -43,16 +43,34 @@ workshop-agentic-security/
 ## Quick start
 
 ```bash
-git clone https://github.com/docker/workshop-agentic-security
-cd workshop-agentic-security
+git clone https://github.com/ajeetraina/labspace-agentic-security
+cd labspace-agentic-security
+bash start-labspace.sh          # then open http://localhost:3030
+```
+
+Or run it manually:
+
+```bash
 docker login
 docker scout config organization YOUR_ORG
 ```
 
+The complete workshop is also hosted at **https://dockerworkshop.vercel.app/**.
+
 ## Workshop deck
 
-The companion slide deck is at [`Workshop Deck.dc.html`](../Workshop%20Deck.dc.html)
-(29 slides, 4 live demo sections).
+The companion slide deck is **"Securing the Agentic Stack: Docker Hardened Images
+and Supply Chain Security"** by Ajeet Raina. The six-part agenda maps directly to
+the labspace sections:
+
+| Deck section | Labspace |
+|--------------|----------|
+| 01 · Why supply chain security matters now | Introduction |
+| 02 · Building blocks (SBOM · VEX · SLSA) | Lab 2 |
+| 03 · Standard image vs DHI | Lab 1 |
+| 04 · Securing your CI pipeline | Lab 3 |
+| 05 · Securing the agentic stack | Lab 4 |
+| 06 · Wrap up | Conclusion |
 
 ## Source material
 

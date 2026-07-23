@@ -1,6 +1,6 @@
 metadata:
-  id: docker/workshop-agentic-security
-  sourceRepo: github.com/docker/workshop-agentic-security
+  id: ajeetraina/labspace-agentic-security
+  sourceRepo: github.com/ajeetraina/labspace-agentic-security
   contentVersion: v1.0.0
 
 title: "Securing the Agentic Stack: Docker Hardened Images & Supply Chain Security"
@@ -13,15 +13,15 @@ description: |
 sections:
   - title: Introduction
     contentPath: 01-introduction.md
-  - title: Setup
+  - title: Prerequisites & Setup
     contentPath: 02-setup.md
-  - title: "Lab 1 — Migrate to Docker Hardened Images"
+  - title: "Lab 1 — Standard Image vs Docker Hardened Images"
     contentPath: 03-lab-migrate-dhi.md
-  - title: "Lab 2 — SBOM Generation & Signature Verification"
+  - title: "Lab 2 — Secure Software Supply Chain (SBOM · VEX · SLSA)"
     contentPath: 04-lab-sbom-attestations.md
-  - title: "Lab 3 — CI Policy Enforcement (GitHub Actions)"
+  - title: "Lab 3 — Securing Your CI Pipeline"
     contentPath: 05-lab-ci-policy.md
-  - title: "Lab 4 — MCP Server on Docker Hardened Images"
+  - title: "Lab 4 — Securing the Agentic Stack (MCP on DHI)"
     contentPath: 06-lab-mcp-dhi.md
   - title: Conclusion & Next Steps
     contentPath: 07-conclusion.md
