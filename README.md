@@ -6,18 +6,18 @@ Hands-on lab materials for the **Securing the Agentic Stack** workshop.
 
 ```
 labspace-agentic-security/
-├── compose.yaml                     # Labspace runtime
+├── compose.yaml                     # Labspace runtime (Gitea-enabled variant)
 ├── compose.override.yaml
 ├── docker-scout-policy.yaml         # Scout build policies
-├── .github/workflows/
-│   └── secure-build.yml             # Complete CI pipeline
+├── .gitea/workflows/
+│   └── secure-build.yaml            # Secure CI pipeline (Gitea Actions)
 ├── labspace/                        # Step-by-step lab guides
 │   ├── labspace.yaml                # Labspace manifest
 │   ├── 01-introduction.md
 │   ├── 02-setup.md
 │   ├── 03-lab-migrate-dhi.md        # Lab 1: Migrate to DHI
 │   ├── 04-lab-sbom-attestations.md  # Lab 2: SBOM + signatures
-│   ├── 05-lab-ci-policy.md          # Lab 3: GitHub Actions
+│   ├── 05-lab-ci-policy.md          # Lab 3: Gitea Actions CI pipeline
 │   ├── 06-lab-mcp-dhi.md            # Lab 4: MCP server on DHI
 │   └── 07-conclusion.md
 └── lab/
@@ -35,10 +35,12 @@ labspace-agentic-security/
 ## Prerequisites
 
 - Docker Desktop 4.30+
-- Docker Hub account (free)
-- `notation` CLI installed (`brew install notation`)
-- GitHub account (for Lab 3)
-- Docker Scout enabled on your org
+- Docker Hub account (free) with Docker Scout enabled on your org
+- `cosign` CLI installed (`brew install cosign`)
+
+> Lab 3 runs its CI pipeline on a **self-hosted Gitea** bundled in the labspace
+> (`git.dockerlabs.xyz`) with a local registry (`registry.dockerlabs.xyz`) — no
+> GitHub account needed.
 
 ## Quick start
 
@@ -56,6 +58,28 @@ docker scout config organization YOUR_ORG
 ```
 
 The complete workshop is also hosted at **https://dockerworkshop.vercel.app/**.
+
+## Facilitator smoke test (run before a live workshop)
+
+Lab 3 depends on the bundled Gitea + runner + registry from the `:dev-sdlc`
+runtime variant. Verify it once before presenting — a few values (notably the
+seeded Gitea repo name) come from the runtime image, not this repo:
+
+1. **Boot it:** `bash start-labspace.sh`, then open http://localhost:3030.
+2. **Gitea is up:** open http://git.dockerlabs.xyz and log in as `moby` / `moby1234`.
+3. **Registry is up:** `curl -s http://registry.dockerlabs.xyz/v2/_catalog` returns JSON.
+4. **Confirm the seeded repo path:** in the workspace terminal run `git remote -v`.
+   Lab 3's image tag uses `${{ github.repository }}`, so it auto-follows this
+   path — but confirm it resolves to `moby/<repo>` as the lab text assumes.
+5. **Pre-configured secrets exist:** in the Gitea repo → Settings → Actions →
+   Secrets, confirm `DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`.
+6. **Scout gate needs cloud auth (not offline):** the Scout step is a real cloud
+   call, so add `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `DOCKER_SCOUT_ORG`
+   as repo secrets, plus `COSIGN_PRIVATE_KEY` / `COSIGN_PASSWORD` for signing
+   (see Lab 3, Step 2). Do a full push once to confirm the pipeline goes green.
+
+> If the seeded repo name or secret names differ in your runtime image, adjust
+> Lab 3's Step 1–2 text accordingly.
 
 ## Workshop deck
 
@@ -83,5 +107,5 @@ which covers 8 container security best practices using `catalog-service-node`.
 - [Docker Scout](https://docs.docker.com/scout/)
 - [MCP Catalog on Docker Hub](https://hub.docker.com/mcp)
 - [SLSA framework](https://slsa.dev)
-- [Notation — image signing](https://notaryproject.dev)
+- [Cosign — image signing](https://docs.sigstore.dev/cosign/)
 - [State of Agentic AI Report](https://docker.com/resources/the-state-of-agentic-ai-white-paper)

@@ -60,9 +60,10 @@ docker scout compare --ignore-unchanged --to BASELINE IMAGE
 docker scout attest list IMAGE
 docker scout sbom IMAGE --format list
 
-# Sign and verify
-notation sign IMAGE
-notation verify IMAGE
+# Sign and verify (key-based)
+cosign generate-key-pair
+cosign sign --key cosign.key IMAGE --yes
+cosign verify --key cosign.pub IMAGE
 
 # Build with full attestations
 docker buildx build --sbom=true --provenance=mode=max -t IMAGE --push .
@@ -81,7 +82,7 @@ docker buildx build --sbom=true --provenance=mode=max -t IMAGE --push .
 | MCP Catalog | hub.docker.com/mcp |
 | SLSA framework | slsa.dev |
 | VEX specification | openvex.dev |
-| Notation (image signing) | notaryproject.dev |
+| Cosign (image signing) | docs.sigstore.dev/cosign |
 | MCP specification | modelcontextprotocol.io |
 | State of Agentic AI Report | docker.com/resources/the-state-of-agentic-ai-white-paper |
 

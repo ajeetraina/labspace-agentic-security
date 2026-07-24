@@ -1,7 +1,13 @@
-# Lab 3 — Securing Your CI Pipeline
+# Lab 3 — Securing Your CI Pipeline (Gitea Actions)
 
-> **Goal:** Wire Docker Scout into a GitHub Actions pipeline. Watch a build fail
-> because of missing attestations and CVEs, then fix it with one Dockerfile change.
+> **Goal:** Wire a Docker Scout policy gate and Cosign signing into a CI pipeline.
+> Watch a build **fail** on a standard base image, then **pass** with one Dockerfile
+> change — all running locally, no GitHub account required.
+
+This labspace bundles **Gitea** — a self-hosted Git service with built-in Actions
+(compatible with GitHub Actions syntax) — plus a Gitea Actions **runner** and a
+local **container registry** at `registry.dockerlabs.xyz`. Your app is already
+checked into Gitea; you just add the secure pipeline.
 
 ## Docker Scout build policies — security as code
 
@@ -10,246 +16,285 @@ your registry or production.
 
 **Policies to enforce today:**
 
-- ✅ Block images with critical CVEs
+- ✅ Block images with critical / high CVEs
 - ✅ Require a valid SBOM attestation
 - ✅ Require SLSA provenance
-- ✅ Block unsigned images from promotion
+- ✅ Sign every image that passes
 
-> Only signed, attested images reach production.
+> Only signed, attested images reach the registry.
 
-```yaml no-copy-button
-# docker-scout-policy.yaml
-version: "1"
-policies:
-  - name: no-critical-cves
-    type: vulnerability
-    severity: critical
-    action: fail
-  - name: require-sbom
-    type: attestation
-    attestation: sbom
-    action: fail
-  - name: require-provenance
-    type: attestation
-    attestation: slsa-provenance
-    action: fail
-```
+## Image signing with Cosign (key-based)
 
-## Image signing with Notation
+Docker Hardened Images are signed with **Cosign** using a key pair — the same model
+you'll use here. Unlike keyless/OIDC signing, key-based signing needs no external
+identity provider, so it runs fully inside the local Gitea runner.
 
-1. Build the image **with attestations**
-2. **Sign** with Notation after push
-3. Signature is stored as an **OCI referrer**
-4. **Verify at deploy** — CI gate or admission controller
-
-```bash no-copy-button
-# Sign the image after push
-notation sign myorg/myapp:v1.0
-
-# Verify before deploy
-notation verify myorg/myapp:v1.0
-```
-
-Works with Docker Hub · AWS ECR · Azure ACR · GitHub GHCR · any OCI registry
-supporting referrers.
+1. Build and push the image **with attestations**
+2. **Sign** with `cosign sign --key` using a private key stored as a Gitea secret
+3. Signature is stored as an **OCI artifact** next to the image
+4. **Verify** with `docker scout attest --verify` (Docker-native) or `cosign verify --key`
 
 ## The complete secure CI pipeline
 
 ```text no-copy-button
-1. CHECKOUT      2. BUILD (DHI)     3. ATTEST         4. POLICY        5. SIGN          6. PUSH
-actions/         FROM docker/       --sbom=true       docker/scout     notation sign    docker/build-
-checkout@v4      hardened-node:20   --provenance      -action@v1       myorg/myapp      push-action@v6
-                                    =mode=max         compare          :v1.0
+1. CHECKOUT      2. BUILD (DHI)     3. ATTEST         4. POLICY        5. PUSH          6. SIGN
+actions/         FROM $$dhiPrefix   --sbom=true       docker/scout     docker/build-    cosign sign
+checkout@v4      $$node:24...       --provenance      -action@v1       push-action@v6   --key (Gitea)
+                                    =mode=max         (hard gate)
 ```
 
-You'll build exactly this pipeline below and watch the **POLICY** gate do its job.
+You'll build exactly this pipeline and watch the **POLICY** gate do its job.
 
 ---
 
-## Step 1 — Fork the repo and add secrets
+## Step 1 — Verify the Gitea remote
 
-Fork `github.com/ajeetraina/labspace-agentic-security` to your GitHub account.
+Your app repo is already seeded into Gitea. Confirm the remote:
 
-Add these secrets in **Settings → Secrets and variables → Actions**:
+```bash terminal-id=main
+git remote -v
+```
+
+You should see `origin` pointing at `http://git.dockerlabs.xyz/moby/<repo>.git`.
+
+:tabLink[Open Gitea]{href="http://git.dockerlabs.xyz" title="Gitea" id="gitea"} and
+log in with **moby** / **moby1234** if prompted, then open your repository.
+
+## Step 2 — Add the pipeline secrets in Gitea
+
+The local-registry secrets (`DOCKER_REGISTRY`, `DOCKER_USERNAME`, `DOCKER_PASSWORD`)
+are **pre-configured**. You need to add three more for the Scout gate and signing.
+
+First generate a Cosign key pair locally (non-interactive for the lab):
+
+```bash terminal-id=main
+export COSIGN_PASSWORD=""
+cosign generate-key-pair
+cat cosign.key   # copy this whole block for the secret below
+```
+
+In Gitea, go to your repo → **Settings → Actions → Secrets** and add:
 
 | Secret | Value |
 |--------|-------|
 | `DOCKERHUB_USERNAME` | Your Docker Hub username |
-| `DOCKERHUB_TOKEN` | Docker Hub access token (read/write) |
+| `DOCKERHUB_TOKEN` | A Docker Hub access token (Scout is a cloud service) |
+| `DOCKER_SCOUT_ORG` | Your Scout-enabled Docker organization |
+| `COSIGN_PRIVATE_KEY` | The full contents of `cosign.key` |
+| `COSIGN_PASSWORD` | Empty (matches the key you just generated) |
 
-## Step 2 — Review the pipeline file
+Keep `cosign.pub` — you'll verify signatures with it later.
 
-Open :fileLink[.github/workflows/secure-build.yml]{path=".github/workflows/secure-build.yml"}.
+## Step 3 — Add the secure pipeline
 
-The pipeline has six jobs in sequence:
+Create the workflow file. Gitea reads workflows from `.gitea/workflows/`.
 
-```yaml no-copy-button
-checkout → build (DHI base) → attest → scout-policy → sign → push
-```
-
-The Scout gate step:
-
-```yaml no-copy-button
-- name: Docker Scout policy check
-  uses: docker/scout-action@v1
-  with:
-    command: compare
-    image: ${{ steps.build.outputs.imageid }}
-    to-env: production
-    ignore-unchanged: true
-    only-severities: critical,high
-    exit-code: true        # ← fails the build if policy not met
-```
-
-`exit-code: true` turns Scout into a hard gate — the pipeline stops and no image
-reaches the registry if policies fail.
-
-## Step 3 — Trigger with a non-DHI base (will fail)
-
-Edit `lab/03-policy/Dockerfile` — comment out the DHI base and uncomment the standard one:
-
-```dockerfile no-copy-button
-# Round 1: standard base — will fail Scout gate
-FROM node:20
-
-WORKDIR /app
-COPY package*.json .
-RUN npm ci
-COPY . .
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
-```bash terminal-id=main
-git add lab/03-policy/Dockerfile
-git commit -m "test: standard base image — should fail"
-git push
-```
-
-Watch the **Actions** tab in GitHub. The pipeline fails at the `scout-policy` step:
-
-```none no-copy-button
-✗  No fixable critical or high vulnerabilities    (2C 26H found)
-✗  Supply chain attestations                      (SBOM missing)
-
-Error: scout compare failed — policy not met
-```
-
-## Step 4 — Fix it: switch to DHI (will pass)
-
-Edit `lab/03-policy/Dockerfile` again:
-
-```yaml save-as=lab/03-policy/Dockerfile
-###########################################################
-# Stage: build
-###########################################################
-FROM $$dhiPrefix$$node:24-debian13-dev AS build
-
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --production --ignore-scripts && npm cache clean --force
-
-###########################################################
-# Stage: final — distroless runtime
-###########################################################
-FROM $$dhiPrefix$$node:24-debian13 AS final
-
-ENV NODE_ENV=production
-WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY ./src ./src
-EXPOSE 3000
-CMD ["node", "src/index.js"]
-```
-
-```bash terminal-id=main
-git add lab/03-policy/Dockerfile
-git commit -m "fix: switch to Docker Hardened Images"
-git push
-```
-
-Watch Actions again. All six steps go green:
-
-```none no-copy-button
-✓  No fixable critical or high vulnerabilities
-✓  Supply chain attestations
-✓  No unapproved base images
-✓  Default non-root user
-
-Image signed with Notation ✓
-Pushed to registry ✓
-```
-
-## Step 5 — Verify the pushed image locally
-
-```bash terminal-id=build
-docker pull $$org$$/catalog-service:latest
-docker scout quickview $$org$$/catalog-service:latest --org $$org$$
-notation verify $$org$$/catalog-service:latest
-```
-
-All three commands confirm: zero CVEs, full attestations, valid signature.
-
-## What the full workflow YAML looks like
-
-```yaml no-copy-button
+```yaml save-as=.gitea/workflows/secure-build.yaml
 name: Secure Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  build-and-push:
+  secure-build:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [registry."registry.dockerlabs.xyz"]
+              insecure = true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to the local registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to Docker Hub (for Docker Scout)
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      # BUILD + ATTEST — load locally so the Scout gate runs before any push
       - name: Build with SBOM and provenance
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: lab/03-policy
+          context: .
           push: false
           load: true
           sbom: true
           provenance: mode=max
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ github.sha }}
+          tags: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:${{ github.sha }}
 
-      - name: Docker Scout policy check
+      # POLICY — hard gate: fail on any critical/high CVE
+      - name: Docker Scout policy gate
         uses: docker/scout-action@v1
         with:
-          command: compare
-          image: ${{ steps.build.outputs.imageid }}
-          to-env: production
-          ignore-unchanged: true
+          command: cves
+          image: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:${{ github.sha }}
+          organization: ${{ secrets.DOCKER_SCOUT_ORG }}
           only-severities: critical,high
           exit-code: true
 
-      - name: Sign with Notation
-        run: |
-          notation sign \
-            ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ github.sha }}
-
-      - name: Push signed image
+      # PUSH — only reached if the gate passed
+      - name: Push image
+        id: push
         uses: docker/build-push-action@v6
         with:
-          context: lab/03-policy
+          context: .
           push: true
           sbom: true
           provenance: mode=max
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:latest
+          tags: ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}:latest
+
+      # SIGN — key-based Cosign
+      - name: Sign the image with Cosign
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            --allow-insecure-registry --allow-http-registry \
+            ${{ secrets.DOCKER_REGISTRY }}/${{ github.repository }}@${DIGEST}
 ```
+
+## Step 4 — Round 1: a standard base (the gate blocks it)
+
+Point the app's `Dockerfile` at a standard base so the Scout gate has something to
+catch:
+
+```dockerfile save-as=Dockerfile
+# Round 1: standard base — will fail the Scout gate
+FROM node:20
+
+WORKDIR /usr/local/app
+COPY package.json package-lock.json ./
+RUN npm ci --production --ignore-scripts && npm cache clean --force
+COPY ./src ./src
+EXPOSE 3000
+CMD ["node", "src/index.js"]
+```
+
+Commit and push:
+
+```bash terminal-id=main
+git add Dockerfile .gitea/workflows/secure-build.yaml
+git commit -m "test: standard base image — should fail the gate"
+git push
+```
+
+:tabLink[Open Gitea Actions]{href="http://git.dockerlabs.xyz" title="Gitea" id="gitea"}
+and open your repo's **Actions** tab. The run fails at the **Docker Scout policy
+gate** step:
+
+```none no-copy-button
+✗  Docker Scout policy gate
+   Detected critical/high vulnerabilities — failing the build.
+
+Error: Process completed with exit code 1
+```
+
+The image is **never pushed** — the gate stopped it.
+
+## Step 5 — Round 2: switch to DHI (the gate passes)
+
+Change the base to a Docker Hardened Image — a multi-stage, distroless build:
+
+```dockerfile save-as=Dockerfile
+###########################################################
+# Stage: build — DHI dev variant (has shell + npm)
+###########################################################
+FROM $$dhiPrefix$$node:24-debian13-dev AS build
+
+WORKDIR /usr/local/app
+COPY package.json package-lock.json ./
+RUN npm ci --production --ignore-scripts && npm cache clean --force
+
+###########################################################
+# Stage: final — DHI runtime (distroless, no shell)
+###########################################################
+FROM $$dhiPrefix$$node:24-debian13 AS final
+
+ENV NODE_ENV=production
+WORKDIR /usr/local/app
+COPY --from=build /usr/local/app/node_modules ./node_modules
+COPY ./src ./src
+EXPOSE 3000
+CMD ["node", "src/index.js"]
+```
+
+Commit and push again:
+
+```bash terminal-id=main
+git add Dockerfile
+git commit -m "fix: switch to Docker Hardened Images"
+git push
+```
+
+Watch the Actions tab again. Every step goes green:
+
+```none no-copy-button
+✓  Build with SBOM and provenance
+✓  Docker Scout policy gate      (0 critical/high)
+✓  Push image
+✓  Sign the image with Cosign
+```
+
+## Step 6 — Verify the pushed, signed image
+
+Confirm the image landed in the local registry:
+
+```bash terminal-id=build
+curl -s http://registry.dockerlabs.xyz/v2/moby/$(basename $(git rev-parse --show-toplevel))/tags/list
+```
+
+Inspect its attestations the Docker-native way — Scout verifies the Sigstore
+signature and reads the attestations in one step:
+
+```bash terminal-id=build
+docker scout attest list registry.dockerlabs.xyz/moby/$(basename $(git rev-parse --show-toplevel)):latest
+```
+
+And verify the Cosign signature with the public key you kept:
+
+```bash terminal-id=build
+cosign verify \
+  --key cosign.pub \
+  --allow-insecure-registry --allow-http-registry \
+  registry.dockerlabs.xyz/moby/$(basename $(git rev-parse --show-toplevel)):latest
+```
+
+```none no-copy-button
+Verification for registry.dockerlabs.xyz/moby/<repo>:latest --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - The signatures were verified against the specified public key
+```
+
+## What you've got
+
+Every push to `main` now:
+
+- **Builds** from a hardened base with a full SBOM + SLSA provenance
+- **Gates** on Docker Scout — no critical/high CVE ever reaches the registry
+- **Pushes** only images that passed the gate
+- **Signs** every pushed image with Cosign, verifiable with a public key
+
+> The same pipeline runs on GitHub Actions, GitLab CI, or any GitHub-Actions-
+> compatible runner — swap the local registry secrets for your real registry and,
+> on GitHub, you can upgrade the signing step to keyless/OIDC.

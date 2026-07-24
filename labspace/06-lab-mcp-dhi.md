@@ -94,9 +94,11 @@ Policy status  SUCCEEDED  (7/7 policies met)
 
 ## Step 4 — Sign the MCP server image
 
+Reuse the Cosign key pair from Lab 2 (or run `cosign generate-key-pair` again):
+
 ```bash terminal-id=build
-notation sign $$org$$/mcp-server:v1
-notation verify $$org$$/mcp-server:v1
+cosign sign --key cosign.key $$org$$/mcp-server:v1 --yes
+cosign verify --key cosign.pub $$org$$/mcp-server:v1
 ```
 
 ## Step 5 — Run with runtime hardening flags
@@ -209,8 +211,8 @@ artifact is trusted.**
 
 ```text no-copy-button
  BASE               BUILD              POLICY            SIGN             REGISTRY          DEPLOY
- DHI Python/Node →  Docker Buildx  →   Scout Check  →    Notation     →   Docker Hub    →  MCP Container
- 0 CVEs · SLSA L3   SBOM+Provenance    No critical CVEs  OCI referrer     Signed image     Verified · Isolated
+ DHI Python/Node →  Docker Buildx  →   Scout Check  →    Cosign       →   Docker Hub    →  MCP Container
+ 0 CVEs · SLSA L3   SBOM+Provenance    No critical CVEs  OCI signature    Signed image     Verified · Isolated
 
                           Agent / MCP client  --invokes-->  Verified MCP server in a DHI container
 ```
